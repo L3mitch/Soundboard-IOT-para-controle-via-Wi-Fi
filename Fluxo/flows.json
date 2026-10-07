@@ -1,0 +1,55 @@
+[
+    {
+        "id": "dd7091bd84f2fa1a",
+        "type": "mqtt in",
+        "z": "7c1a7bc6e2492754",
+        "name": "",
+        "topic": "satc/botoes",
+        "qos": "2",
+        "datatype": "auto-detect",
+        "broker": "633f12cebdc47b87",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 450,
+        "y": 560,
+        "wires": [
+            [
+                "f20b92d4ed561315",
+                "7532fc99e286b4a4"
+            ]
+        ]
+    },
+    {
+        "id": "633f12cebdc47b87",
+        "type": "mqtt-broker",
+        "name": "notebook ao celular",
+        "broker": "localhost",
+        "port": 1883,
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    }
+]
