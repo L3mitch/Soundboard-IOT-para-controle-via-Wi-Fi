@@ -1,19 +1,14 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include "secrets.h"
 
-//
-// ===== WIFI =====
-//
-
-const char* ssid = "Aula_Satc";
-const char* password = "123teste";
 
 //
 // ===== MQTT =====
 //
 
-const char* mqtt_server = "10.85.237.252"; // Troque pelo IP real do broker/Node-RED
+const char* mqtt_server = MQTT_SERVER; // Troque pelo IP real do broker/Node-RED
 const char* mqtt_topic_botoes = "satc/botoes";
 
 WiFiClient espClient;
@@ -54,9 +49,12 @@ void setup_wifi() {
 
   Serial.println();
   Serial.print("Conectando em ");
-  Serial.println(ssid);
+  Serial.println(WIFI_SSID);
 
-  WiFi.begin(ssid, password);
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_STA);
+
+  WiFi.begin(WIFI_SSID, WPA2_AUTH_PEAP, EAP_IDENTITY, EAP_USERNAME, EAP_PASSWORD);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
