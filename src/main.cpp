@@ -3,40 +3,84 @@
 #include <PubSubClient.h>
 #include "secrets.h"
 
-
 //
 // ===== MQTT =====
 //
 
-const char* mqtt_server = MQTT_SERVER; // Troque pelo IP real do broker/Node-RED
+const char* mqtt_server = MQTT_SERVER; 
 const char* mqtt_topic_botoes = "satc/botoes";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
 //
-// ===== BOTÕES =====
+// ===== LEDS =====
+//
+
+#define LED_Verde 3
+#define LED_Vermelho 14
+
+//
+// ===== MATRIZ DE BOTÕES 2x5 =====
 //
 
 const unsigned long DEBOUNCE_MS = 50;
 
-struct Botao {
-  uint8_t pino;
-  const char* cor;
-  int ultimoEstadoLido;
-  int estadoEstavel;
-  unsigned long ultimoTempoDebounce;
+const uint8_t NUM_LINHAS  = 2;
+const uint8_t NUM_COLUNAS = 5;
+
+const uint8_t PINOS_LINHAS[NUM_LINHAS]   = {4, 15};
+const uint8_t PINOS_COLUNAS[NUM_COLUNAS] = {23, 22, 21, 19, 18};
+
+// Cor de cada botão: CORES[linha][coluna]. Ajuste conforme a sua montagem.
+const char* CORES[NUM_LINHAS][NUM_COLUNAS] = {
+  {"vermelho1", "verde1",  "azul1",  "amarelo1",  "preto1"},
+  {"vermelho2", "verde2",  "azul2",  "amarelo2",  "preto2"},
 };
 
-// Para adicionar um novo botão, inclua uma linha aqui
-Botao botoes[] = {
-  {23,  "amarelo",  LOW, LOW, 0},
-  {22,  "azul",     LOW, LOW, 0},
-  {4,   "verde",    LOW, LOW, 0},
-  {2,   "vermelho", LOW, LOW, 0},
+struct EstadoTecla {
+  int ultimoLido;
+  int estavel;
+  unsigned long ultimoTempo;
 };
 
-const size_t NUM_BOTOES = sizeof(botoes) / sizeof(botoes[0]);
+EstadoTecla teclas[NUM_LINHAS][NUM_COLUNAS];   // começa tudo zerado (LOW)
+
+void enviarBotao(const char* cor) {
+  if (client.publish(mqtt_topic_botoes, cor)) {
+    Serial.print("Botão pressionado, enviado: ");
+    Serial.println(cor);
+  } else {
+    Serial.println("Falha ao publicar no MQTT");
+  }
+}
+
+void verificarMatriz() {
+  for (uint8_t l = 0; l < NUM_LINHAS; l++) {
+
+    digitalWrite(PINOS_LINHAS[l], HIGH);
+    delayMicroseconds(10);                       // tempo para o sinal estabilizar
+
+    for (uint8_t c = 0; c < NUM_COLUNAS; c++) {
+      EstadoTecla &t = teclas[l][c];
+      int leitura = digitalRead(PINOS_COLUNAS[c]);
+
+      if (leitura != t.ultimoLido) {
+        t.ultimoTempo = millis();
+        t.ultimoLido = leitura;
+      }
+
+      if ((millis() - t.ultimoTempo) > DEBOUNCE_MS && leitura != t.estavel) {
+        t.estavel = leitura;
+        if (t.estavel == HIGH) {
+          enviarBotao(CORES[l][c]);
+        }
+      }
+    }
+
+    digitalWrite(PINOS_LINHAS[l], LOW);
+  }
+}
 
 //
 // ======================================================
@@ -72,7 +116,12 @@ void reconnect() {
 
     if (client.connect("ESP32Client")) {
       Serial.println("conectado");
+      digitalWrite(LED_Verde, HIGH);
+      digitalWrite(LED_Vermelho, LOW);
+
     } else {
+      digitalWrite(LED_Verde, LOW);
+      digitalWrite(LED_Vermelho, HIGH);
       Serial.print("falhou, rc=");
       Serial.print(client.state());
       Serial.println(" tentando novamente em 5 segundos");
@@ -81,42 +130,8 @@ void reconnect() {
   }
 }
 
-//
-// Envia a cor do botão pressionado via MQTT
-//
 
-void enviarBotao(const char* cor) {
-  if (client.publish(mqtt_topic_botoes, cor)) {
-    Serial.print("Botão pressionado, enviado: ");
-    Serial.println(cor);
-  } else {
-    Serial.println("Falha ao publicar no MQTT");
-  }
-}
 
-//
-// Lê um botão com debounce e envia na borda de subida
-//
-
-void verificarBotao(Botao &b) {
-  int leitura = digitalRead(b.pino);
-
-  if (leitura != b.ultimoEstadoLido) {
-    b.ultimoTempoDebounce = millis();
-    b.ultimoEstadoLido = leitura;
-  }
-
-  if ((millis() - b.ultimoTempoDebounce) > DEBOUNCE_MS) {
-    if (leitura != b.estadoEstavel) {
-      b.estadoEstavel = leitura;
-
-      // HIGH = botão pressionado
-      if (b.estadoEstavel == HIGH) {
-        enviarBotao(b.cor);
-      }
-    }
-  }
-}
 
 //
 // ======================================================
@@ -128,10 +143,18 @@ void setup() {
   Serial.begin(115200);
 
   // Pull-down já existe na placa, então INPUT simples
-  for (size_t i = 0; i < NUM_BOTOES; i++) {
-    pinMode(botoes[i].pino, INPUT);
+  for (uint8_t l = 0; l < NUM_LINHAS; l++) {
+    pinMode(PINOS_LINHAS[l], OUTPUT);
+    digitalWrite(PINOS_LINHAS[l], LOW);
+  }
+  for (uint8_t c = 0; c < NUM_COLUNAS; c++) {
+    pinMode(PINOS_COLUNAS[c], INPUT);
   }
 
+  pinMode(LED_Verde, OUTPUT);
+  pinMode(LED_Vermelho, OUTPUT);
+  digitalWrite(LED_Verde, LOW);
+  digitalWrite(LED_Vermelho, HIGH);
   setup_wifi();
 
   client.setServer(mqtt_server, 1883);
@@ -150,7 +173,5 @@ void loop() {
 
   client.loop();
 
-  for (size_t i = 0; i < NUM_BOTOES; i++) {
-    verificarBotao(botoes[i]);
-  }
+  verificarMatriz();
 }
