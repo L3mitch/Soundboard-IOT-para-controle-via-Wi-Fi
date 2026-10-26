@@ -29,8 +29,8 @@ const unsigned long DEBOUNCE_MS = 50;
 const uint8_t NUM_LINHAS  = 2;
 const uint8_t NUM_COLUNAS = 5;
 
-const uint8_t PINOS_LINHAS[NUM_LINHAS]   = {4, 15};
-const uint8_t PINOS_COLUNAS[NUM_COLUNAS] = {23, 22, 21, 19, 18};
+const uint8_t PINOS_LINHAS[NUM_LINHAS]   = {26, 27};
+const uint8_t PINOS_COLUNAS[NUM_COLUNAS] = {34, 35, 32, 33, 25};
 
 const char* CORES[NUM_LINHAS][NUM_COLUNAS] = {
   {"vermelho1", "verde1", "azul1", "amarelo1", "preto1"},
