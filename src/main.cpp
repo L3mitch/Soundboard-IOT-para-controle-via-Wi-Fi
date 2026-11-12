@@ -1,46 +1,49 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include "secrets.h"
 #include <LittleFS.h>
 #include <TFT_eSPI.h>
 #include <TJpg_Decoder.h>
+#include "secrets.h"
 #include "telasom.h"
 
-//
-// ===== MQTT =====
-//
+// ======================================================
+// CONFIGURAÇÃO
+// ======================================================
 
+// --- MQTT ---
 const char *mqtt_server = MQTT_SERVER;
 const char *mqtt_topic_botoes = "satc/botoes";
+const char *MQTT_CLIENT_ID = "ESP32Client";
+const uint16_t MQTT_PORTA = 1883;
+const uint32_t RECONEXAO_MS = 5000;
+
+// --- Matriz de botões 2x5 ---
+const uint8_t NUM_LINHAS = 2;
+const uint8_t NUM_COLUNAS = 5;
+const uint8_t PINOS_LINHAS[NUM_LINHAS] = {26, 27};
+const uint8_t PINOS_COLUNAS[NUM_COLUNAS] = {34, 35, 32, 33, 25};
+const unsigned long DEBOUNCE_MS = 50;
+const uint32_t VARREDURA_MS = 5;
+
+// Nome de cada som (é o que vai pro MQTT e pra tela)
+const char *SONS[NUM_LINHAS][NUM_COLUNAS] = {
+    {"ERROU!", "ACERTOU", "IIIIRRRRRAAAA", "RATTINNHHOO", "Rapaaaazz"},
+    {"ESSE EH O MEU PATRAO", "Zap", "Trombone", "Ba dum tss", "Grilo"},
+};
+
+// --- FreeRTOS ---
+#define FILA_TAMANHO 20
+
+// ======================================================
+// VARIÁVEIS GLOBAIS
+// ======================================================
 
 TFT_eSPI tft = TFT_eSPI();
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-//
-// ===== LEDS =====
-//
-
-#define LED_Verde 3
-#define LED_Vermelho 14
-
-//
-// ===== MATRIZ DE BOTÕES 2x5 =====
-//
-
-const unsigned long DEBOUNCE_MS = 50;
-
-const uint8_t NUM_LINHAS = 2;
-const uint8_t NUM_COLUNAS = 5;
-
-const uint8_t PINOS_LINHAS[NUM_LINHAS] = {26, 27};
-const uint8_t PINOS_COLUNAS[NUM_COLUNAS] = {34, 35, 32, 33, 25};
-
-const char *CORES[NUM_LINHAS][NUM_COLUNAS] = {
-    {"ERROU!", "ACERTOU", "IIIIRRRRRAAAA", "RATTINNHHOO", "Rapaaaazz"},
-    {"ESSE EH O MEU PATRAO", "Zap", "Trombone", "Ba dum tss", "Grilo"},
-};
+QueueHandle_t filaBotoes; // guarda ponteiros para as strings de SONS
 
 struct EstadoTecla
 {
@@ -51,9 +54,9 @@ struct EstadoTecla
 
 EstadoTecla teclas[NUM_LINHAS][NUM_COLUNAS];
 
-//
-// ===== DISPLAY =====
-//
+// ======================================================
+// DISPLAY
+// ======================================================
 
 // Chamada pelo decodificador JPG para desenhar cada bloco na tela
 bool saida(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t *bitmap)
@@ -128,26 +131,21 @@ void mostrarImagem()
   Serial.println("imagem desenhada");
 }
 
-//
-// ===== FREERTOS =====
-//
-
-QueueHandle_t filaBotoes;            // guarda ponteiros para as strings de CORES
-volatile bool mqttConectado = false; // lido pela task de LEDs
-
-void setMQTTStatus(bool s)
+void iniciarDisplay()
 {
-  mqttConectado = s;          // continua alimentando os LEDs
-  atualizarStatusMQTT(s);     // atualiza a barra da tela
+  tft.init();
+  tft.setRotation(1); // paisagem 320x240, igual a imagem
+  Serial.printf("w=%d h=%d\n", tft.width(), tft.height());
+
+  testeInicial();
+  delay(3000); // tempo para ver o teste
+  mostrarImagem();
+  desenharTelaSom();
 }
 
-#define FILA_TAMANHO 20
-
-//
 // ======================================================
 // WIFI
 // ======================================================
-//
 
 void setup_wifi()
 {
@@ -157,8 +155,7 @@ void setup_wifi()
 
   WiFi.disconnect(true);
   WiFi.mode(WIFI_STA);
-
-  WiFi.begin(WIFI_SSID, WPA2_AUTH_PEAP, EAP_IDENTITY, EAP_USERNAME, EAP_PASSWORD);
+  WiFi.begin(WIFI_SSID, EAP_PASSWORD);
 
   while (WiFi.status() != WL_CONNECTED)
   {
@@ -166,22 +163,41 @@ void setup_wifi()
     Serial.print(".");
   }
 
-  Serial.println("");
+  Serial.println();
   Serial.println("WiFi conectado");
   Serial.println(WiFi.localIP());
 }
 
-//
 // ======================================================
-// TASK 1: BOTÕES (varredura da matriz + debounce)
+// BOTÕES (varredura da matriz + debounce)
 // ======================================================
-//
+
+void iniciarBotoes()
+{
+  for (uint8_t l = 0; l < NUM_LINHAS; l++)
+  {
+    pinMode(PINOS_LINHAS[l], OUTPUT);
+    digitalWrite(PINOS_LINHAS[l], LOW);
+  }
+  for (uint8_t c = 0; c < NUM_COLUNAS; c++)
+  {
+    pinMode(PINOS_COLUNAS[c], INPUT); // pull-down externo de 10k
+  }
+}
+
+// Coloca o som na fila sem bloquear (se estiver cheia, descarta)
+void enviarParaFila(const char *som)
+{
+  if (xQueueSend(filaBotoes, &som, 0) != pdTRUE)
+  {
+    Serial.println("Fila cheia, evento descartado");
+  }
+}
 
 void verificarMatriz()
 {
   for (uint8_t l = 0; l < NUM_LINHAS; l++)
   {
-
     digitalWrite(PINOS_LINHAS[l], HIGH);
     delayMicroseconds(10);
 
@@ -202,12 +218,7 @@ void verificarMatriz()
 
         if (t.estavel == HIGH)
         {
-          const char *cor = CORES[l][c];
-          // Não bloqueia: se a fila estiver cheia, descarta o evento
-          if (xQueueSend(filaBotoes, &cor, 0) != pdTRUE)
-          {
-            Serial.println("Fila cheia, evento descartado");
-          }
+          enviarParaFila(SONS[l][c]);
         }
       }
     }
@@ -221,133 +232,104 @@ void taskBotoes(void *param)
   for (;;)
   {
     verificarMatriz();
-    vTaskDelay(pdMS_TO_TICKS(5)); // varredura a cada ~5 ms
+    vTaskDelay(pdMS_TO_TICKS(VARREDURA_MS));
   }
 }
 
-//
 // ======================================================
-// TASK 2: MQTT (conexão, client.loop e publicação)
+// MQTT (conexão, client.loop e publicação)
 // ======================================================
-//
+
+// Retorna true se o Wi-Fi está conectado; senão tenta reconectar
+bool garantirWiFi()
+{
+  if (WiFi.status() == WL_CONNECTED)
+    return true;
+
+  atualizarStatusMQTT(false);
+  Serial.println("WiFi perdido, reconectando...");
+  WiFi.reconnect();
+  vTaskDelay(pdMS_TO_TICKS(RECONEXAO_MS));
+  return false;
+}
+
+// Retorna true se o MQTT está conectado; senão tenta reconectar
+bool garantirMQTT()
+{
+  if (client.connected())
+    return true;
+
+  atualizarStatusMQTT(false);
+  Serial.print("Tentando conexão MQTT...");
+
+  if (client.connect(MQTT_CLIENT_ID))
+  {
+    Serial.println("conectado");
+    xQueueReset(filaBotoes); // descarta cliques antigos da época offline
+    atualizarStatusMQTT(true);
+    return true;
+  }
+
+  Serial.print("falhou, rc=");
+  Serial.print(client.state());
+  Serial.println(" tentando novamente em 5 segundos");
+  vTaskDelay(pdMS_TO_TICKS(RECONEXAO_MS));
+  return false;
+}
+
+// Espera até 10 ms por um clique; publica no MQTT e mostra na tela
+void processarFila()
+{
+  const char *som;
+
+  if (xQueueReceive(filaBotoes, &som, pdMS_TO_TICKS(10)) != pdTRUE)
+    return;
+
+  if (client.publish(mqtt_topic_botoes, som))
+  {
+    mostrarSom(som);
+    Serial.print("Botão pressionado, enviado: ");
+    Serial.println(som);
+  }
+  else
+  {
+    Serial.println("Falha ao publicar no MQTT");
+  }
+}
 
 void taskMQTT(void *param)
 {
-  const char *cor;
-
   for (;;)
   {
-
-    // Reconecta o Wi-Fi se cair
-    if (WiFi.status() != WL_CONNECTED)
-    {
-      setMQTTStatus(false);
-      Serial.println("WiFi perdido, reconectando...");
-      WiFi.reconnect();
-      vTaskDelay(pdMS_TO_TICKS(5000));
+    if (!garantirWiFi())
       continue;
-    }
-
-    // Reconecta o MQTT se cair
-    if (!client.connected())
-    {
-      setMQTTStatus(false);
-      Serial.print("Tentando conexão MQTT...");
-
-      if (client.connect("ESP32Client"))
-      {
-        Serial.println("conectado");
-        xQueueReset(filaBotoes); // descarta cliques antigos da época offline
-        setMQTTStatus(true);
-      }
-      else
-      {
-        Serial.print("falhou, rc=");
-        Serial.print(client.state());
-        Serial.println(" tentando novamente em 5 segundos");
-        vTaskDelay(pdMS_TO_TICKS(5000));
-        continue;
-      }
-    }
+    if (!garantirMQTT())
+      continue;
 
     client.loop();
-
-    // Espera até 10 ms por um clique; depois volta para o client.loop()
-    if (xQueueReceive(filaBotoes, &cor, pdMS_TO_TICKS(10)) == pdTRUE)
-    {
-      if (client.publish(mqtt_topic_botoes, cor))
-      {
-        mostrarSom(cor);
-        Serial.print("Botão pressionado, enviado: ");
-        Serial.println(cor);
-      }
-      else
-      {
-        Serial.println("Falha ao publicar no MQTT");
-      }
-    }
+    processarFila();
   }
 }
 
-//
-// ======================================================
-// TASK 3: LEDS de status
-// ======================================================
-//
-
-void taskLEDs(void *param)
-{
-  for (;;)
-  {
-    digitalWrite(LED_Verde, mqttConectado ? HIGH : LOW);
-    digitalWrite(LED_Vermelho, mqttConectado ? LOW : HIGH);
-    vTaskDelay(pdMS_TO_TICKS(200));
-  }
-}
-
-//
 // ======================================================
 // SETUP / LOOP
 // ======================================================
-//
 
 void setup()
 {
   Serial.begin(115200);
 
-  tft.init();
-  tft.setRotation(1); // paisagem 320x240, igual a imagem
-  Serial.printf("w=%d h=%d\n", tft.width(), tft.height());
-
-  testeInicial();
-  delay(3000); // tempo para ver o teste
-  mostrarImagem();
-  desenharTelaSom();
-
-  for (uint8_t l = 0; l < NUM_LINHAS; l++)
-  {
-    pinMode(PINOS_LINHAS[l], OUTPUT);
-    digitalWrite(PINOS_LINHAS[l], LOW);
-  }
-  for (uint8_t c = 0; c < NUM_COLUNAS; c++)
-  {
-    pinMode(PINOS_COLUNAS[c], INPUT); // pull-down externo de 10k
-  }
-
-  pinMode(LED_Verde, OUTPUT);
-  pinMode(LED_Vermelho, OUTPUT);
-  digitalWrite(LED_Verde, LOW);
-  digitalWrite(LED_Vermelho, HIGH);
+  iniciarDisplay();
+  iniciarBotoes();
 
   setup_wifi();
-  client.setServer(mqtt_server, 1883);
+  client.setServer(mqtt_server, MQTT_PORTA);
 
   filaBotoes = xQueueCreate(FILA_TAMANHO, sizeof(const char *));
 
   // (função, nome, stack em bytes, parâmetro, prioridade, handle, core)
   xTaskCreatePinnedToCore(taskMQTT, "MQTT", 4096, NULL, 2, NULL, 0);
   xTaskCreatePinnedToCore(taskBotoes, "Botoes", 2048, NULL, 3, NULL, 1);
-  xTaskCreatePinnedToCore(taskLEDs, "LEDs", 2048, NULL, 1, NULL, 1);
 }
 
 void loop()

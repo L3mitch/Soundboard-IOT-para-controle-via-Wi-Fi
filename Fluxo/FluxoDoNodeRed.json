@@ -1,0 +1,502 @@
+[
+    {
+        "id": "7c1a7bc6e2492754",
+        "type": "tab",
+        "label": "Fluxo 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "633f12cebdc47b87",
+        "type": "mqtt-broker",
+        "name": "notebook ao celular",
+        "broker": "localhost",
+        "port": 1883,
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "6bdcec93940b62cd",
+        "type": "ttsultimate-config",
+        "name": "TTS Service",
+        "noderedipaddress": "AUTODISCOVER",
+        "noderedport": "1980",
+        "purgediratrestart": "leave",
+        "ttsservice": "googletranslate",
+        "TTSRootFolderPath": ""
+    },
+    {
+        "id": "8d552d2c5ea75d13",
+        "type": "obs-instance",
+        "name": "OBS Instance",
+        "host": "192.168.7.16",
+        "port": 4455
+    },
+    {
+        "id": "dd7091bd84f2fa1a",
+        "type": "mqtt in",
+        "z": "7c1a7bc6e2492754",
+        "name": "",
+        "topic": "satc/botoes",
+        "qos": "2",
+        "datatype": "auto-detect",
+        "broker": "633f12cebdc47b87",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 310,
+        "y": 820,
+        "wires": [
+            [
+                "7532fc99e286b4a4",
+                "13715a840f767c78"
+            ]
+        ]
+    },
+    {
+        "id": "f20b92d4ed561315",
+        "type": "exec",
+        "z": "7c1a7bc6e2492754",
+        "command": "spd-say -l pt ",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "",
+        "winHide": false,
+        "oldrc": false,
+        "name": "",
+        "x": 610,
+        "y": 980,
+        "wires": [
+            [],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "7532fc99e286b4a4",
+        "type": "debug",
+        "z": "7c1a7bc6e2492754",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 600,
+        "y": 740,
+        "wires": []
+    },
+    {
+        "id": "684ae929175df352",
+        "type": "obs request",
+        "z": "7c1a7bc6e2492754",
+        "name": "ERROU!",
+        "obsInstance": "8d552d2c5ea75d13",
+        "requests": [
+            {
+                "rt": "TriggerMediaInputAction",
+                "rtt": "requestName",
+                "rd": "{\"inputName\":\"Errou\",\"mediaAction\":\"OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART\"}",
+                "rdt": "json"
+            }
+        ],
+        "batchExecutionType": "SerialRealtime",
+        "haltOnFailure": false,
+        "reqType": "",
+        "reqTypeType": "",
+        "reqData": "",
+        "reqDataType": "",
+        "x": 1020,
+        "y": 660,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "13715a840f767c78",
+        "type": "switch",
+        "z": "7c1a7bc6e2492754",
+        "name": "Verifica qual som deve ser tocado",
+        "property": "payload",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "ERROU!",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "ACERTOU",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "IIIIRRRRRAAAA",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "RATTINNHHOO",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "Rapaaaazz",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "ESSE EH O MEU PATRAO",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "Zap",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "Trombone",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "Ba dum tss",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "Grilo",
+                "vt": "str"
+            }
+        ],
+        "checkall": "false",
+        "repair": false,
+        "outputs": 10,
+        "x": 680,
+        "y": 840,
+        "wires": [
+            [
+                "684ae929175df352"
+            ],
+            [
+                "e3c46d42619f27c2"
+            ],
+            [
+                "a9e0a51fe0608da5"
+            ],
+            [
+                "eed79252f92f7bf4"
+            ],
+            [
+                "f50b829f28892af6"
+            ],
+            [
+                "fab5ec97edcd90c7"
+            ],
+            [
+                "3a3e2d78a2c323a6"
+            ],
+            [
+                "260eb9bbbdfb478a"
+            ],
+            [
+                "f81e47207a056cf7"
+            ],
+            [
+                "84402dc637f727c7"
+            ]
+        ]
+    },
+    {
+        "id": "f50b829f28892af6",
+        "type": "obs request",
+        "z": "7c1a7bc6e2492754",
+        "name": "Rapaaaazz",
+        "obsInstance": "8d552d2c5ea75d13",
+        "requests": [
+            {
+                "rt": "TriggerMediaInputAction",
+                "rtt": "requestName",
+                "rd": "{\"inputName\":\"rapaz\",\"mediaAction\":\"OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART\"}",
+                "rdt": "json"
+            }
+        ],
+        "batchExecutionType": "SerialRealtime",
+        "haltOnFailure": false,
+        "reqType": "",
+        "reqTypeType": "",
+        "reqData": "",
+        "reqDataType": "",
+        "x": 1030,
+        "y": 820,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "eed79252f92f7bf4",
+        "type": "obs request",
+        "z": "7c1a7bc6e2492754",
+        "name": "RATTINNHHOO",
+        "obsInstance": "8d552d2c5ea75d13",
+        "requests": [
+            {
+                "rt": "TriggerMediaInputAction",
+                "rtt": "requestName",
+                "rd": "{\"inputName\":\"ratinhooo\",\"mediaAction\":\"OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART\"}",
+                "rdt": "json"
+            }
+        ],
+        "batchExecutionType": "SerialRealtime",
+        "haltOnFailure": false,
+        "reqType": "",
+        "reqTypeType": "",
+        "reqData": "",
+        "reqDataType": "",
+        "x": 1040,
+        "y": 780,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "a9e0a51fe0608da5",
+        "type": "obs request",
+        "z": "7c1a7bc6e2492754",
+        "name": "IIIIRRRRRAAAA",
+        "obsInstance": "8d552d2c5ea75d13",
+        "requests": [
+            {
+                "rt": "TriggerMediaInputAction",
+                "rtt": "requestName",
+                "rd": "{\"inputName\":\"iiiirrrraaaa\",\"mediaAction\":\"OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART\"}",
+                "rdt": "json"
+            }
+        ],
+        "batchExecutionType": "SerialRealtime",
+        "haltOnFailure": false,
+        "reqType": "",
+        "reqTypeType": "",
+        "reqData": "",
+        "reqDataType": "",
+        "x": 1040,
+        "y": 740,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "398023a45ef8fd5d",
+        "type": "comment",
+        "z": "7c1a7bc6e2492754",
+        "name": "Teste",
+        "info": "",
+        "x": 590,
+        "y": 940,
+        "wires": []
+    },
+    {
+        "id": "fab5ec97edcd90c7",
+        "type": "obs request",
+        "z": "7c1a7bc6e2492754",
+        "name": "Patrão",
+        "obsInstance": "8d552d2c5ea75d13",
+        "requests": [
+            {
+                "rt": "TriggerMediaInputAction",
+                "rtt": "requestName",
+                "rd": "{\"inputName\":\"patrão\",\"mediaAction\":\"OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART\"}",
+                "rdt": "json"
+            }
+        ],
+        "batchExecutionType": "SerialRealtime",
+        "haltOnFailure": false,
+        "reqType": "",
+        "reqTypeType": "",
+        "reqData": "",
+        "reqDataType": "",
+        "x": 1010,
+        "y": 860,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "260eb9bbbdfb478a",
+        "type": "obs request",
+        "z": "7c1a7bc6e2492754",
+        "name": "Trombone",
+        "obsInstance": "8d552d2c5ea75d13",
+        "requests": [
+            {
+                "rt": "TriggerMediaInputAction",
+                "rtt": "requestName",
+                "rd": "{\"inputName\":\"Trombone\",\"mediaAction\":\"OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART\"}",
+                "rdt": "json"
+            }
+        ],
+        "batchExecutionType": "SerialRealtime",
+        "haltOnFailure": false,
+        "reqType": "",
+        "reqTypeType": "",
+        "reqData": "",
+        "reqDataType": "",
+        "x": 1020,
+        "y": 940,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "f81e47207a056cf7",
+        "type": "obs request",
+        "z": "7c1a7bc6e2492754",
+        "name": "Ba dum tss",
+        "obsInstance": "8d552d2c5ea75d13",
+        "requests": [
+            {
+                "rt": "TriggerMediaInputAction",
+                "rtt": "requestName",
+                "rd": "{\"inputName\":\"Ba dum tss\",\"mediaAction\":\"OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART\"}",
+                "rdt": "json"
+            }
+        ],
+        "batchExecutionType": "SerialRealtime",
+        "haltOnFailure": false,
+        "reqType": "",
+        "reqTypeType": "",
+        "reqData": "",
+        "reqDataType": "",
+        "x": 1030,
+        "y": 980,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "84402dc637f727c7",
+        "type": "obs request",
+        "z": "7c1a7bc6e2492754",
+        "name": "Grilo",
+        "obsInstance": "8d552d2c5ea75d13",
+        "requests": [
+            {
+                "rt": "TriggerMediaInputAction",
+                "rtt": "requestName",
+                "rd": "{\"inputName\":\"grilo\",\"mediaAction\":\"OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART\"}",
+                "rdt": "json"
+            }
+        ],
+        "batchExecutionType": "SerialRealtime",
+        "haltOnFailure": false,
+        "reqType": "",
+        "reqTypeType": "",
+        "reqData": "",
+        "reqDataType": "",
+        "x": 1010,
+        "y": 1020,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "e3c46d42619f27c2",
+        "type": "obs request",
+        "z": "7c1a7bc6e2492754",
+        "name": "ACERTOU",
+        "obsInstance": "8d552d2c5ea75d13",
+        "requests": [
+            {
+                "rt": "TriggerMediaInputAction",
+                "rtt": "requestName",
+                "rd": "{\"inputName\":\"Acertou\",\"mediaAction\":\"OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART\"}",
+                "rdt": "json"
+            }
+        ],
+        "batchExecutionType": "SerialRealtime",
+        "haltOnFailure": false,
+        "reqType": "",
+        "reqTypeType": "",
+        "reqData": "",
+        "reqDataType": "",
+        "x": 1030,
+        "y": 700,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "3a3e2d78a2c323a6",
+        "type": "obs request",
+        "z": "7c1a7bc6e2492754",
+        "name": "Zap",
+        "obsInstance": "8d552d2c5ea75d13",
+        "requests": [
+            {
+                "rt": "TriggerMediaInputAction",
+                "rtt": "requestName",
+                "rd": "{\"inputName\":\"Zapzap\",\"mediaAction\":\"OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART\"}",
+                "rdt": "json"
+            }
+        ],
+        "batchExecutionType": "SerialRealtime",
+        "haltOnFailure": false,
+        "reqType": "",
+        "reqTypeType": "",
+        "reqData": "",
+        "reqDataType": "",
+        "x": 1010,
+        "y": 900,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "694c9004803ffccf",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-contrib-tts-ultimate": "3.3.2",
+            "node-red-contrib-obs-ws": "1.2.3"
+        }
+    }
+]
