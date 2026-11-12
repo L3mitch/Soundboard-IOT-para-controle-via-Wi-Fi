@@ -6,6 +6,7 @@
 ![Node-RED](https://img.shields.io/badge/Node--RED-fluxos-8F0000)
 ![OBS](https://img.shields.io/badge/OBS%20Studio-WebSocket-302E31)
 ![Linux](https://img.shields.io/badge/Linux-dev-yellow)
+![Windows](https://img.shields.io/badge/Windows-suportado-0078D6)
 
 Soundboard física baseada em **ESP32** que envia comandos por **MQTT** para um computador, onde o **Node-RED** os traduz em ações no **OBS Studio** via **OBS WebSocket**. Cada botão dispara um efeito sonoro durante transmissões ou gravações.
 
@@ -21,14 +22,10 @@ Soundboard física baseada em **ESP32** que envia comandos por **MQTT** para um 
 - [Arquitetura](#-arquitetura)
 - [Funcionalidades](#-funcionalidades)
 - [Hardware](#-hardware)
-- [Tecnologias](#-tecnologias)
 - [Estrutura do repositório](#-estrutura-do-repositório)
 - [Como executar](#-como-executar)
 - [Protocolo de mensagens MQTT](#-protocolo-de-mensagens-mqtt)
-- [Resultados](#-resultados)
-- [Desafios e soluções](#-desafios-e-soluções)
-- [Trabalhos futuros](#-trabalhos-futuros)
-- [Documentação complementar](#-documentação-complementar)
+- [Resultados](#-funcionamento-esperado)
 
 ---
 
@@ -80,7 +77,7 @@ flowchart LR
 | ESP32 (DevKit) | 1 | Núcleo da soundboard |
 | Botões (push button) | 10 | Ligados em matriz |
 | Display LCD | 1 | 2.4" TFT SPI 240X320 |
-| Protoboard e jumpers | — | Montagem do protótipo |
+| Protoboard e jumpers | ∞ | Montagem do protótipo |
 
 ### Ligações (pinagem)
 
@@ -101,7 +98,7 @@ flowchart LR
 | **MQTT / Mosquitto** | Protocolo e broker local que intermedeiam ESP32 e computador |
 | **Node-RED** | Fluxos que recebem as mensagens MQTT e decidem os comandos |
 | **OBS WebSocket** | Interface nativa do OBS Studio para controle externo em tempo real |
-| **Linux** | Sistema operacional do notebook de desenvolvimento |
+| **Linux / Windows** | Sistemas operacionais suportados para o computador (desenvolvido em Linux) |
 
 ## 📂 Estrutura do repositório
 
@@ -122,13 +119,15 @@ flowchart LR
 
 ## 🚀 Como executar
 
+O projeto roda em **Linux** e em **Windows**. Os passos são os mesmos; só mudam os comandos de instalação e algumas configurações do sistema. Onde houver diferença, as instruções aparecem separadas por sistema.
+
 ### Pré-requisitos
 
 - ESP32 montado conforme a seção [Hardware](#-hardware)
-- Computador na **mesma rede Wi-Fi** do ESP32
+- Computador (Linux ou Windows) na **mesma rede Wi-Fi** do ESP32
 - [PlatformIO](https://platformio.org/) (CLI ou extensão do VS Code)
 - [Mosquitto](https://mosquitto.org/)
-- [Node-RED](https://nodered.org/)
+- [Node-RED](https://nodered.org/) (requer [Node.js](https://nodejs.org/))
 - [OBS Studio](https://obsproject.com/) 28 ou superior (OBS WebSocket já incluído)
 
 ### 1. Clonar o repositório
@@ -138,16 +137,20 @@ git clone https://github.com/L3mitch/Soundboard-IOT-para-controle-via-Wi-Fi.git
 cd Soundboard-IOT-para-controle-via-Wi-Fi
 ```
 
+> No Windows, use o terminal do VS Code, o PowerShell ou o Git Bash. É necessário ter o [Git](https://git-scm.com/download/win) instalado.
+
 ### 2. Configurar o broker Mosquitto
 
-Instale e habilite o serviço (exemplo em Debian/Ubuntu):
+Como o ESP32 se conecta pela rede (não por `localhost`), o Mosquitto 2.x precisa aceitar conexões externas.
+
+#### 🐧 Linux (Debian/Ubuntu)
 
 ```bash
 sudo apt install mosquitto mosquitto-clients
 sudo systemctl enable --now mosquitto
 ```
 
-Como o ESP32 se conecta pela rede (não por `localhost`), o Mosquitto 2.x precisa aceitar conexões externas. Crie `/etc/mosquitto/conf.d/local.conf`:
+Crie o arquivo `/etc/mosquitto/conf.d/local.conf`:
 
 ```conf
 listener 1883
@@ -158,7 +161,11 @@ allow_anonymous true
 sudo systemctl restart mosquitto
 ```
 
-> 🔒 `allow_anonymous true` é adequado apenas para rede local de testes.
+Descubra o IP do computador (será usado no `MQTT_SERVER` do firmware):
+
+```bash
+hostname -I
+```
 
 Teste se o broker está recebendo mensagens:
 
@@ -166,9 +173,46 @@ Teste se o broker está recebendo mensagens:
 mosquitto_sub -h localhost -t "satc/botoes" -v
 ```
 
+#### 🪟 Windows
+
+1. Baixe e instale o Mosquitto em [mosquitto.org/download](https://mosquitto.org/download/) (instalador para Windows). Na instalação, mantenha marcada a opção de instalar como **serviço**.
+2. Abra o **Bloco de Notas como administrador** e edite o arquivo `C:\Program Files\mosquitto\mosquitto.conf`, adicionando ao final:
+
+   ```conf
+   listener 1883
+   allow_anonymous true
+   ```
+
+3. Abra o **PowerShell como administrador** e reinicie o serviço:
+
+   ```powershell
+   net stop mosquitto
+   net start mosquitto
+   ```
+
+4. **Libere a porta 1883 no Firewall do Windows** (sem isso o ESP32 não consegue conectar), ainda no PowerShell como administrador:
+
+   ```powershell
+   netsh advfirewall firewall add rule name="Mosquitto MQTT" dir=in action=allow protocol=TCP localport=1883
+   ```
+
+5. Descubra o IP do computador (campo *Endereço IPv4* do adaptador Wi-Fi), que será usado no `MQTT_SERVER` do firmware:
+
+   ```powershell
+   ipconfig
+   ```
+
+6. Teste o broker. Os executáveis ficam em `C:\Program Files\mosquitto`; abra o PowerShell nessa pasta (ou adicione-a ao `PATH`):
+
+   ```powershell
+   & "C:\Program Files\mosquitto\mosquitto_sub.exe" -h localhost -t "satc/botoes" -v
+   ```
+
+> 🔒 `allow_anonymous true` é adequado apenas para rede local de testes.
+
 ### 3. Gravar o firmware no ESP32
 
-Configure suas credenciais de rede no arquivo "include/secrets_example.h":
+Configure suas credenciais de rede no arquivo `include/secrets_example.h` e **renomeie-o para `secrets.h`**:
 
 ```cpp
 // Renomeie este arquivo para "secrets.h" e adicione suas credenciais de Wi-Fi e MQTT.
@@ -183,22 +227,55 @@ Configure suas credenciais de rede no arquivo "include/secrets_example.h":
 #define MQTT_SERVER    "IP_DO_SERVIDOR_MQTT"
 ```
 
-Libere o acesso à porta serial no Linux (erro comum de *permission denied*) e grave:
+> Use no `MQTT_SERVER` o IP do computador obtido no passo anterior.
+
+#### 🐧 Linux
+
+Libere o acesso à porta serial (erro comum de *permission denied*) e grave:
 
 ```bash
 sudo usermod -aG dialout $USER   # faça logout/login depois
-cd firmware
 pio run --target upload
 pio device monitor               # acompanhar o log serial
 ```
 
 > Em algumas distribuições (ex.: Arch) o grupo é `uucp` em vez de `dialout`.
 
+#### 🪟 Windows
+
+1. Instale o [VS Code](https://code.visualstudio.com/) e a extensão **PlatformIO IDE**.
+2. Instale o driver USB-serial da sua placa, se o Windows não reconhecer o ESP32 como uma porta **COM** (veja em *Gerenciador de Dispositivos → Portas (COM e LPT)*):
+   - Chips **CP210x**: [driver da Silicon Labs](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers)
+   - Chips **CH340**: driver do fabricante WCH
+3. Abra a pasta do projeto no VS Code. O PlatformIO instala as dependências automaticamente.
+4. Clique em **Upload** (ícone →) na barra inferior, ou use o terminal do PlatformIO:
+
+   ```powershell
+   pio run --target upload
+   pio device monitor               # acompanhar o log serial
+   ```
+
+> Se o upload falhar com *"Failed to connect"*, segure o botão **BOOT** do ESP32 durante o início da gravação. Não é necessário configurar permissões de porta serial no Windows.
+
 ### 4. Configurar o Node-RED
+
+#### 🐧 Linux
 
 ```bash
 node-red
 ```
+
+#### 🪟 Windows
+
+1. Instale o [Node.js](https://nodejs.org/) (versão LTS).
+2. No PowerShell, instale e execute o Node-RED:
+
+   ```powershell
+   npm install -g --unsafe-perm node-red
+   node-red
+   ```
+
+#### Nos dois sistemas
 
 1. Abra `http://localhost:1880`.
 2. Instale o nó de OBS WebSocket pelo *Manage palette*: `[nome do pacote utilizado]`.
@@ -210,7 +287,7 @@ node-red
 ### 5. Configurar o OBS Studio
 
 1. Em **Ferramentas → Configurações do servidor WebSocket**, ative o servidor e defina uma senha.
-2. Crie/configure as fontes de áudio dos efeitos sonoros: `[descreva: fontes de mídia, nomes usados no fluxo...]`.
+2. Crie/configure as fontes de áudio dos efeitos sonoros (há sons de exemplo na pasta `Sons/`): `[descreva: fontes de mídia, nomes usados no fluxo...]`.
 
 ### 6. Testar
 
@@ -224,7 +301,13 @@ Pressione um botão na soundboard. Você deve ver:
 Também é possível simular um botão sem o hardware:
 
 ```bash
+# Linux
 mosquitto_pub -h localhost -t "satc/botoes" -m "1"
+```
+
+```powershell
+# Windows (PowerShell)
+& "C:\Program Files\mosquitto\mosquitto_pub.exe" -h localhost -t "satc/botoes" -m "1"
 ```
 
 > ⚠️ Ajuste o payload (`"1"`) para o formato que seu firmware realmente envia.
@@ -239,40 +322,10 @@ mosquitto_pub -h localhost -t "satc/botoes" -m "1"
 | Assinante | Node-RED |
 | Payload | `[descreva: ex. número do botão 1–10]` |
 
-## ✅ Resultados
-
-O protótipo operou com êxito no fluxo completo, de ponta a ponta:
+## ✅ Funcionamento esperado
 
 - Na inicialização, o LCD executa uma sequência de testes visuais e, em seguida, confirma a conexão com o broker MQTT
 - Ao acionar qualquer botão, o ESP32 identifica a entrada instantaneamente e exibe o nome do som no LCD
 - A mensagem é publicada no tópico MQTT e chega ao Node-RED, que envia o comando ao OBS via WebSocket
 - O OBS executa o efeito sonoro de forma imediata, sem atrasos perceptíveis
 - O sistema apresentou alta estabilidade na troca de mensagens assíncronas
-
-## 🧗 Desafios e soluções
-
-| Desafio | Solução |
-|---|---|
-| **Permissão da porta USB no Linux** impedia gravar o ESP32 | Liberação de acesso à porta serial (grupo `dialout`) |
-| **Dependências e bibliotecas** do PlatformIO, Mosquitto e Node-RED | Instalação e atualização dos pacotes necessários após pesquisa |
-| **Protoboard**: conexões instáveis e sensíveis a ruído | Reforço das conexões; solução definitiva prevista com PCB própria |
-| **Tela LCD**: duas das três telas separadas estavam com defeito, o que levou a um tempo gasto depurando software | Troca da tela; lição: isolar e testar o hardware antes de depurar o código |
-| **Dez botões com poucos pinos** | Pesquisa e implementação de **matriz de botões** |
-
-## 🔮 Trabalhos futuros
-
-- [ ] **PCB dedicada** para eliminar mau contato e ruídos da protoboard
-- [ ] **Status da rede Wi-Fi** no display, além do status do broker MQTT, para facilitar a depuração
-- [ ] **Menus com encoder rotativo** para alternar entre bancos de efeitos e configurações
-- [ ] **Gabinete impresso em 3D** e botões mais táteis e ergonômicos
-
-## 📚 Documentação complementar
-
-- 📄 [Relatório final (Etapa N1C)](docs/relatorio-final.pdf)
-- 🎥 Vídeo de demonstração: `[link]`
-
-## 👤 Autor
-
-**Michel Almeida da Rosa**
-Trilha formativa: Internet das Coisas (IoT) · Centro Universitário UniSATC
-GitHub: [@L3mitch](https://github.com/L3mitch)
